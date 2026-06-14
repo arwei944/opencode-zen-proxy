@@ -1,3 +1,10 @@
+---
+tags:
+- docker
+- node
+- proxy
+---
+
 # OpenCode Zen Proxy
 
 一个尽量简洁的 OpenCode Zen API 代理服务。
