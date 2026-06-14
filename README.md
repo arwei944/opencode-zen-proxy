@@ -1,4 +1,5 @@
 ---
+sdk: docker
 tags:
 - docker
 - node
