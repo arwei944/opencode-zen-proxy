@@ -41,12 +41,13 @@ async function proxy(req, res) {
     const upstream = await fetch(upstreamPath(req), {
       method: req.method,
       headers: cleanHeaders(req.headers),
-      body: JSON.stringify({ ...req.body, model: MODEL }),
+      body: req.method === 'GET' ? undefined : JSON.stringify({ ...req.body, model: MODEL }),
       signal: controller.signal,
     });
 
     res.status(upstream.status);
-    res.setHeader('content-type', upstream.headers.get('content-type') || 'application/json');
+    // 上游可能返回 text/plain 但内容是 JSON，统一设为 application/json
+    res.setHeader('content-type', 'application/json');
 
     if (upstream.body) {
       for await (const chunk of upstream.body) res.write(chunk);
@@ -79,7 +80,7 @@ app.get('/v1/models', async (req, res) => {
       signal: controller.signal,
     });
     res.status(upstream.status);
-    res.setHeader('content-type', upstream.headers.get('content-type') || 'application/json');
+    res.setHeader('content-type', 'application/json');
     res.send(await upstream.text());
   } catch (err) {
     const timeout = err.name === 'AbortError';
