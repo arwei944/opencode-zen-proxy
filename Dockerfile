@@ -1,9 +1,9 @@
-# HF Space / 通用 Docker 部署
+# HF Space Docker 部署
 FROM node:20-slim
 
 WORKDIR /app
 
-ENV DEFAULT_MODEL=deepseek-v4-flash-free
+ENV MODEL=deepseek-v4-flash-free
 
 COPY package.json ./
 RUN npm install --production
