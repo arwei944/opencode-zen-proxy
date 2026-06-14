@@ -1,0 +1,16 @@
+{
+  "name": "opencode-zen-proxy",
+  "version": "2.0.0",
+  "description": "OpenCode Zen Free API proxy — OpenAI & Anthropic compatible",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
