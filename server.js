@@ -11,9 +11,12 @@ app.use(express.json({ limit: '20mb' }));
 // ── 工具函数 ──
 
 function upstreamPath(req) {
-  // req.url 是 "/v1/chat/completions"，API_BASE 是 "https://opencode.ai/zen/v1"
+  // API_BASE = "https://opencode.ai/zen/v1"
+  // req.url = "/v1/chat/completions"
   // 结果: "https://opencode.ai/zen/v1/chat/completions"
-  return `${API_BASE}${req.originalUrl}`;
+  const url = new URL(req.url, 'http://x');
+  const path = url.pathname.startsWith('/v1') ? url.pathname.substring(3) : url.pathname;
+  return `${API_BASE}${path}`;
 }
 
 function cleanHeaders(headers) {
