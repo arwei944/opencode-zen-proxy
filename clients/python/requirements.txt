@@ -1,2 +1,0 @@
-# OpenCode Zen Python 客户端
-# 纯标准库，无外部依赖

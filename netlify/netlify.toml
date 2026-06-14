@@ -1,8 +1,0 @@
-[build]
-  publish = "public"
-  command = "echo 'skip build - Deno native'"
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/serve/:splat"
-  status = 200

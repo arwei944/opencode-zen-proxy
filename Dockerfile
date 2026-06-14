@@ -3,6 +3,8 @@ FROM node:20-slim
 
 WORKDIR /app
 
+ENV DEFAULT_MODEL=deepseek-v4-flash-free
+
 COPY package.json ./
 RUN npm install --production
 
