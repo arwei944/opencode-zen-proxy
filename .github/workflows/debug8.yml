@@ -1,0 +1,30 @@
+name: Debug Test 8
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: how many
+        required: true
+        default: '5'
+      prefix:
+        description: name prefix
+        required: true
+        default: 'zen-proxy'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install huggingface-hub
+      - name: test step
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python3 << 'EOF'
+from huggingface_hub import HfApi
+api = HfApi(token="'"$HF_TOKEN"'")
+print("ok")
+EOF
