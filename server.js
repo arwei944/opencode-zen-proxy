@@ -1,64 +1,52 @@
 const express = require('express');
 
 const PORT = Number(process.env.PORT || 7860);
-const API_BASE = (process.env.API_BASE || 'https://opencode.ai/zen/v1').replace(/\/$/, '');
-const API_TIMEOUT = Number(process.env.API_TIMEOUT || 30000);
-const MODEL = process.env.MODEL || 'deepseek-v4-flash-free';
+const API_BASE = 'https://opencode.ai/zen/v1';
+const API_TIMEOUT = Number(process.env.API_TIMEOUT || 60000);
+const MODEL = 'deepseek-v4-flash-free';
 
 const app = express();
 app.use(express.json({ limit: '20mb' }));
 
 // ── 工具函数 ──
 
-function upstreamPath(req) {
-  // API_BASE = "https://opencode.ai/zen/v1"
-  // req.url = "/v1/chat/completions"
-  // 结果: "https://opencode.ai/zen/v1/chat/completions"
-  const url = new URL(req.url, 'http://x');
-  const path = url.pathname.startsWith('/v1') ? url.pathname.substring(3) : url.pathname;
-  return `${API_BASE}${path}`;
-}
-
-function cleanHeaders(headers) {
-  const next = { 'content-type': 'application/json' };
-  for (const name of ['authorization', 'anthropic-version', 'x-api-key']) {
-    if (headers[name]) next[name] = headers[name];
-  }
-  return next;
-}
-
 function sendError(res, status, message) {
   res.status(status).json({ error: { message, type: 'proxy_error' } });
 }
 
-// ── 核心代理逻辑 ──
+// ── 创建代理处理函数（直接指定上游路径）──
 
-async function proxy(req, res) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
+function createProxy(upstreamPath) {
+  return async (req, res) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
+    const upstreamUrl = `${API_BASE}${upstreamPath}`;
 
-  try {
-    const upstream = await fetch(upstreamPath(req), {
-      method: req.method,
-      headers: cleanHeaders(req.headers),
-      body: req.method === 'GET' ? undefined : JSON.stringify({ ...req.body, model: MODEL }),
-      signal: controller.signal,
-    });
+    try {
+      const upstream = await fetch(upstreamUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...req.body,
+          model: MODEL,
+        }),
+        signal: controller.signal,
+      });
 
-    res.status(upstream.status);
-    // 上游可能返回 text/plain 但内容是 JSON，统一设为 application/json
-    res.setHeader('content-type', 'application/json');
+      res.status(upstream.status);
+      res.setHeader('content-type', 'application/json');
 
-    if (upstream.body) {
-      for await (const chunk of upstream.body) res.write(chunk);
+      if (upstream.body) {
+        for await (const chunk of upstream.body) res.write(chunk);
+      }
+      res.end();
+    } catch (err) {
+      const timeout = err.name === 'AbortError';
+      sendError(res, timeout ? 504 : 502, timeout ? '请求超时' : '上游请求失败');
+    } finally {
+      clearTimeout(timer);
     }
-    res.end();
-  } catch (err) {
-    const timeout = err.name === 'AbortError';
-    sendError(res, timeout ? 504 : 502, timeout ? '请求超时' : '上游请求失败');
-  } finally {
-    clearTimeout(timer);
-  }
+  };
 }
 
 // ── 路由定义 ──
@@ -67,16 +55,21 @@ app.get('/', (req, res) => {
   res.json({ service: 'OpenCode Zen Proxy', model: MODEL });
 });
 
-app.post('/v1/chat/completions', proxy);
-app.post('/v1/messages', proxy);
+// OpenAI 格式聊天
+app.post('/v1/chat/completions', createProxy('/chat/completions'));
 
+// Anthropic 格式消息
+app.post('/v1/messages', createProxy('/messages'));
+
+// 模型列表
 app.get('/v1/models', async (req, res) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   try {
     const upstream = await fetch(`${API_BASE}/models`, {
-      headers: cleanHeaders(req.headers),
+      method: 'GET',
+      headers: { 'content-type': 'application/json' },
       signal: controller.signal,
     });
     res.status(upstream.status);
@@ -90,6 +83,7 @@ app.get('/v1/models', async (req, res) => {
   }
 });
 
+// 404 处理
 app.use((req, res) => sendError(res, 404, 'Not Found'));
 
 app.listen(PORT, '0.0.0.0', () => {
