@@ -1,5 +1,5 @@
 # HF Space Docker 部署 - OpenCode Zen Proxy
-FROM node:20-slim@sha256:8d5ac0e1ef991b994f66b44af2ae01aa8f11c4f5b3766c04dd5dd36bed8a78
+FROM node:20-slim
 
 WORKDIR /app
 
