@@ -1,0 +1,59 @@
+name: Batch Deploy Zen Proxy
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: how many
+        required: true
+        default: "5"
+      prefix:
+        description: name prefix
+        required: true
+        default: "zen-proxy"
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install huggingface-hub
+      - name: run
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -e
+          for i in $(seq 1 ${{ inputs.count }}); do
+            SN="${{ inputs.prefix }}-${i}"
+            python3 -c "
+from huggingface_hub import HfApi
+api = HfApi(token='\$HF_TOKEN')
+api.create_repo(
+    repo_id='arwei945/' + '$SN',
+    repo_type='space',
+    space_sdk='docker',
+    private=False,
+    exist_ok=True
+)
+print(f'created $SN')
+"
+            D="/tmp/s$i"
+            git clone "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SN" "$D"
+            cd "$D"
+            git config user.email "x@x" && git config user.name "x"
+            cp "$GITHUB_WORKSPACE/server.js" ./
+            cp "$GITHUB_WORKSPACE/package.json" ./
+            cp "$GITHUB_WORKSPACE/Dockerfile" ./
+            git add -A && git commit -m "deploy" || true
+            git push "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SN" main 2>&1 || git push "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SN" master 2>&1
+            cd "$GITHUB_WORKSPACE"
+          done
+      - name: config
+        run: |
+          for i in $(seq 1 ${{ inputs.count }}); do
+            echo "Space $i: arwei945-${{ inputs.prefix }}-${i}.hf.space"
+            echo "Endpoint: https://arwei945-${{ inputs.prefix }}-${i}.hf.space/v1"
+            echo "Model: deepseek-v4-flash-free"
+            echo ""
+          done
