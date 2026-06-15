@@ -4,6 +4,7 @@ FROM node:20-slim
 
 WORKDIR /app
 
+# 固定使用 deepseek-v4-flash-free 免费模型，不需要 API Key
 ENV MODEL=deepseek-v4-flash-free
 
 COPY package.json ./
