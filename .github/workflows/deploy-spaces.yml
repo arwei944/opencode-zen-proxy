@@ -1,0 +1,145 @@
+name: 批量创建 HF Space 并部署 Zen Proxy
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: '创建数量'
+        required: true
+        default: '5'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+      name_prefix:
+        description: 'Space 名称前缀'
+        required: true
+        default: 'zen-proxy'
+        type: string
+      api_key:
+        description: '可选：设置 PROXY_API_KEY 认证密钥（留空不启用）'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  create-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          pip install huggingface-hub
+
+      - name: 批量创建并部署 HF Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_PREFIX: ${{ inputs.name_prefix }}
+          SPACE_COUNT: ${{ inputs.count }}
+          PROXY_API_KEY: ${{ inputs.api_key }}
+        run: |
+          set -e
+          if [ -z "$HF_TOKEN" ]; then
+            echo "❌ 错误：需要在 GitHub Secrets 中设置 HF_TOKEN"
+            exit 1
+          fi
+
+          # 获取用户名
+          WHOAMI=$(python3 -c "
+from huggingface_hub import HfApi
+api = HfApi(token='$HF_TOKEN')
+user = api.whoami()
+print(user['name'])
+          ")
+          echo "HF 用户: $WHOAMI"
+
+          for i in $(seq 1 $SPACE_COUNT); do
+            SPACE_NAME="${SPACE_PREFIX}-${i}"
+            SPACE_ID="${WHOAMI}/${SPACE_NAME}"
+            echo ""
+            echo "═══════════════════════════════════════════"
+            echo "🚀 [$i/$SPACE_COUNT] 创建 Space: $SPACE_ID"
+            echo "═══════════════════════════════════════════"
+
+            # 创建 Space
+            python3 -c "
+from huggingface_hub import HfApi
+api = HfApi(token='$HF_TOKEN')
+try:
+    url = api.create_repo(
+        repo_id='$SPACE_ID',
+        repo_type='space',
+        space_sdk='docker',
+        private=False,
+        exist_ok=True
+    )
+    print(f'✅ Space 创建成功: {url}')
+except Exception as e:
+    print(f'❌ 创建失败: {e}')
+    exit(1)
+            "
+
+            # 克隆 Space 仓库
+            SPACE_DIR="/tmp/space-$i"
+            rm -rf "$SPACE_DIR"
+            git clone "https://user:$HF_TOKEN@huggingface.co/spaces/$SPACE_ID" "$SPACE_DIR"
+            cd "$SPACE_DIR"
+
+            # 配置 git 用户
+            git config user.email "github-actions@users.noreply.github.com"
+            git config user.name "GitHub Actions"
+
+            # 复制代码
+            cp "$GITHUB_WORKSPACE/server.js" "$SPACE_DIR/"
+            cp "$GITHUB_WORKSPACE/package.json" "$SPACE_DIR/"
+            cp "$GITHUB_WORKSPACE/Dockerfile" "$SPACE_DIR/"
+
+            # 如果设置了 API Key，写入 Dockerfile 的 ENV（供参考）
+            if [ -n "$PROXY_API_KEY" ]; then
+              echo "# PROXY_API_KEY 将通过 HF Secrets 设置" >> "$SPACE_DIR/README.md"
+            fi
+
+            # 提交并推送
+            git add -A
+            git commit -m "部署 Zen Proxy v2.1.0" || echo "无变更跳过"
+            git push "https://user:$HF_TOKEN@huggingface.co/spaces/$SPACE_ID" main 2>&1 || git push "https://user:$HF_TOKEN@huggingface.co/spaces/$SPACE_ID" master 2>&1
+
+            echo "✅ Space [$i/$SPACE_COUNT] 部署完成"
+            cd "$GITHUB_WORKSPACE"
+          done
+
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "🎉 全部 Space 创建部署完成！"
+          echo "═══════════════════════════════════════════"
+
+      - name: 输出配置
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════"
+          echo "📋 配置信息如下："
+          echo "═══════════════════════════════════════════"
+          for i in $(seq 1 ${{ inputs.count }}); do
+            SPACE_NAME="${{ inputs.name_prefix }}-${i}"
+            echo ""
+            echo "  🔹 Space $i: https://${{ secrets.HF_TOKEN && 'arwei945' || 'USERNAME' }}-${SPACE_NAME}.hf.space"
+            echo "  API Endpoint: https://${{ secrets.HF_TOKEN && 'arwei945' || 'USERNAME' }}-${SPACE_NAME}.hf.space/v1"
+            echo "  模型名: deepseek-v4-flash-free"
+            if [ -n "${{ inputs.api_key }}" ]; then
+              echo "  API Key: ${{ inputs.api_key }}"
+            else
+              echo "  API Key: 未设置（无需认证）"
+            fi
+            echo ""
+          done
+          echo "═══════════════════════════════════════════"

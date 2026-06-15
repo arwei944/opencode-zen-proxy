@@ -2,3 +2,8 @@ node_modules/
 .env
 *.log
 deno.lock
+channel.json
+cookies.txt
+test.json
+token.json
+__pycache__/
