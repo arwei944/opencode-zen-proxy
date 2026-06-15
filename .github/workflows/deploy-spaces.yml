@@ -51,3 +51,13 @@ print(f'created: {url}')
             git push "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SPACE_NAME" main 2>&1 || git push "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SPACE_NAME" master 2>&1
             cd "$GITHUB_WORKSPACE"
           done
+      - name: show config
+        run: |
+          echo "=== CONFIG ==="
+          for i in $(seq 1 ${{ inputs.count }}); do
+            echo "Space $i: arwei945-${{ inputs.prefix }}-${i}.hf.space"
+            echo "Endpoint: https://arwei945-${{ inputs.prefix }}-${i}.hf.space/v1"
+            echo "Model: deepseek-v4-flash-free"
+            echo "Key: (unset, no auth)"
+            echo ""
+          done
