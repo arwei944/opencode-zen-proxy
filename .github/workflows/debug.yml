@@ -1,0 +1,13 @@
+name: Debug Test
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: how many
+        required: true
+        default: '5'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
