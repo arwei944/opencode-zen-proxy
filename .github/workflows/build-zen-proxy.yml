@@ -1,0 +1,14 @@
+name: Build Zen Proxy Spaces
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: how many
+        required: true
+        default: '5'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: echo "Building ${{ inputs.count }} spaces"
