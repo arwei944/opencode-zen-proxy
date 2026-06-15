@@ -1,7 +1,70 @@
-name: "Test Workflow"
-on: workflow_dispatch
+name: Deploy Zen Proxy Spaces
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: how many spaces to create
+        required: true
+        default: '5'
+      prefix:
+        description: space name prefix
+        required: true
+        default: 'zen-proxy'
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - run: echo hello
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install huggingface-hub
+      - name: create spaces and push code
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -e
+          for i in $(seq 1 ${{ inputs.count }}); do
+            SPACE_NAME="${{ inputs.prefix }}-${i}"
+            echo "--- [$i/${{ inputs.count }}] $SPACE_NAME ---"
+            python3 -c "
+from huggingface_hub import HfApi
+api = HfApi(token='\$HF_TOKEN')
+url = api.create_repo(
+    repo_id='arwei945/' + '$SPACE_NAME',
+    repo_type='space',
+    space_sdk='docker',
+    private=False,
+    exist_ok=True
+)
+print(f'created: {url}')
+"
+            DIR="/tmp/spaces/${i}"
+            mkdir -p "$DIR"
+            git clone "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SPACE_NAME" "$DIR"
+            cd "$DIR"
+            git config user.email "bot@bot.com"
+            git config user.name "Bot"
+            cp "$GITHUB_WORKSPACE/server.js" ./
+            cp "$GITHUB_WORKSPACE/package.json" ./
+            cp "$GITHUB_WORKSPACE/Dockerfile" ./
+            git add -A
+            git commit -m "deploy zen proxy" || true
+            git push "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SPACE_NAME" main 2>&1 || git push "https://user:\$HF_TOKEN@huggingface.co/spaces/arwei945/$SPACE_NAME" master 2>&1
+            cd "$GITHUB_WORKSPACE"
+            echo "done: $SPACE_NAME"
+          done
+      - name: print config
+        run: |
+          echo "========================================"
+          echo "ALL SPACES CREATED - CONFIG:"
+          echo "========================================"
+          for i in $(seq 1 ${{ inputs.count }}); do
+            echo ""
+            echo "SPACE $i:"
+            echo "  URL: https://arwei945-${{ inputs.prefix }}-${i}.hf.space"
+            echo "  ENDPOINT: https://arwei945-${{ inputs.prefix }}-${i}.hf.space/v1"
+            echo "  MODEL: deepseek-v4-flash-free"
+            echo ""
+          done
+
