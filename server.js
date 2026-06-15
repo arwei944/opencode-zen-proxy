@@ -52,7 +52,18 @@ function createProxy(upstreamPath) {
 // ── 路由定义 ──
 
 app.get('/', (req, res) => {
-  res.json({ service: 'OpenCode Zen Proxy', model: MODEL });
+  res.json({ service: 'OpenCode Zen Proxy', model: MODEL, version: '2.1.0' });
+});
+
+// 调试端点
+app.post('/debug', (req, res) => {
+  res.json({
+    version: '2.1.0',
+    bodyKeys: Object.keys(req.body),
+    upstreamBase: API_BASE,
+    model: MODEL,
+    contentType: req.headers['content-type'],
+  });
 });
 
 // OpenAI 格式聊天
