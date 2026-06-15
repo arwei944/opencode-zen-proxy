@@ -1,4 +1,5 @@
-# HF Space Docker 部署
+# HF Space Docker 部署 - OpenCode Zen Proxy
+# 只使用 deepseek-v4-flash-free 免费模型，不需要 API Key
 FROM node:20-slim
 
 WORKDIR /app
